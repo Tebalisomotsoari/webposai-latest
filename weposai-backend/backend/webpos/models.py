@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser, Group, Permission # type: ignore
+for rom django.contrib.auth.models import AbstractUser, Group, Permission # type: ignore
 from django.db import models # type: ignore
 
 
