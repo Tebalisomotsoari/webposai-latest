@@ -1,49 +1,72 @@
 from rest_framework import serializers
 from .models import (
-    User, Store, Category, Product, Customer, Order,
-    Sale, SaleItem, MarketTill, Transaction, Payment,
+    Tenant, User, Store,
+    ProductCategory, ServiceCategory, Product, Service,
+    Customer, Order, Sale, SaleItem,
+    Inventory, InventoryTransaction,
+    MarketTill, Transaction, Payment, Commission,
+    Delivery, Promotion, Tax,
     InventoryAlert, Receipt
 )
 
+# ----------------------------
+# Tenant Serializer
+# ----------------------------
+
+class TenantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tenant
+        fields = ['id', 'name', 'domain', 'created_at']
+
 
 # ----------------------------
-# 1. User Serializer
+# User Serializer
 # ----------------------------
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'is_active']
+        fields = ['id', 'username', 'email', 'role', 'is_active', 'tenant']
 
 
 # ----------------------------
-# 2. Store Serializer
+# Store Serializer
 # ----------------------------
 
 class StoreSerializer(serializers.ModelSerializer):
-    manager = UserSerializer(read_only=True)
+    tenant = TenantSerializer(read_only=True)
 
     class Meta:
         model = Store
-        fields = ['id', 'name', 'location', 'store_type', 'manager']
+        fields = ['id', 'name', 'location', 'store_type', 'tenant']
 
 
 # ----------------------------
-# 3. Category Serializer
+# Product Category Serializer
 # ----------------------------
 
-class CategorySerializer(serializers.ModelSerializer):
+class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
-        model = Category
-        fields = ['id', 'name', 'description']
+        model = ProductCategory
+        fields = ['id', 'name', 'description', 'tenant']
 
 
 # ----------------------------
-# 4. Product Serializer
+# Service Category Serializer
+# ----------------------------
+
+class ServiceCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceCategory
+        fields = ['id', 'name', 'description', 'tenant']
+
+
+# ----------------------------
+# Product Serializer
 # ----------------------------
 
 class ProductSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
+    category = ProductCategorySerializer(read_only=True)
     store = StoreSerializer(read_only=True)
 
     class Meta:
@@ -51,22 +74,37 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'sku', 'barcode', 'price', 'discount',
             'quantity', 'alert_threshold', 'unit_type',
-            'category', 'store'
+            'category', 'store', 'tenant'
         ]
 
 
 # ----------------------------
-# 5. Customer Serializer
+# Service Serializer
+# ----------------------------
+
+class ServiceSerializer(serializers.ModelSerializer):
+    category = ServiceCategorySerializer(read_only=True)
+
+    class Meta:
+        model = Service
+        fields = [
+            'id', 'name', 'description', 'price',
+            'category', 'tenant'
+        ]
+
+
+# ----------------------------
+# Customer Serializer
 # ----------------------------
 
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ['id', 'name', 'email', 'phone', 'created_at']
+        fields = ['id', 'name', 'email', 'phone', 'created_at', 'tenant']
 
 
 # ----------------------------
-# 6. Order Serializer
+# Order Serializer
 # ----------------------------
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -78,21 +116,26 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'customer', 'store', 'status',
-            'created_at', 'updated_at', 'created_by'
+            'created_at', 'updated_at', 'created_by', 'tenant'
         ]
 
 
 # ----------------------------
-# 7. Sale & Sale Item Serializer
+# Sale Item Serializer
 # ----------------------------
 
 class SaleItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
+    service = ServiceSerializer(read_only=True)
 
     class Meta:
         model = SaleItem
-        fields = ['id', 'product', 'quantity', 'price_at_sale', 'subtotal']
+        fields = ['id', 'product', 'service', 'quantity', 'price_at_sale', 'subtotal', 'tenant']
 
+
+# ----------------------------
+# Sale Serializer
+# ----------------------------
 
 class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True, read_only=True)
@@ -104,12 +147,38 @@ class SaleSerializer(serializers.ModelSerializer):
         model = Sale
         fields = [
             'id', 'order', 'timestamp', 'cashier',
-            'store', 'customer', 'total', 'payment_method', 'items'
+            'store', 'customer', 'total', 'payment_method', 'items', 'tenant'
         ]
 
 
 # ----------------------------
-# 8. Market Till Serializer
+# Inventory Serializer
+# ----------------------------
+
+class InventorySerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    store = StoreSerializer(read_only=True)
+
+    class Meta:
+        model = Inventory
+        fields = ['id', 'product', 'store', 'quantity', 'minimum_stock_level', 'tenant']
+
+
+# ----------------------------
+# Inventory Transaction Serializer
+# ----------------------------
+
+class InventoryTransactionSerializer(serializers.ModelSerializer):
+    inventory = InventorySerializer(read_only=True)
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = InventoryTransaction
+        fields = ['id', 'inventory', 'transaction_type', 'quantity', 'timestamp', 'user', 'tenant']
+
+
+# ----------------------------
+# Market Till Serializer
 # ----------------------------
 
 class MarketTillSerializer(serializers.ModelSerializer):
@@ -122,32 +191,84 @@ class MarketTillSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'store', 'opening_balance', 'closing_balance',
             'opened_at', 'closed_at', 'is_open',
-            'opened_by', 'closed_by'
+            'opened_by', 'closed_by', 'tenant'
         ]
 
 
 # ----------------------------
-# 9. Transaction & Payment
+# Transaction Serializer
 # ----------------------------
 
 class TransactionSerializer(serializers.ModelSerializer):
-    sale = serializers.PrimaryKeyRelatedField(read_only=True)
+    sale = SaleSerializer(read_only=True)
 
     class Meta:
         model = Transaction
-        fields = ['id', 'sale', 'transaction_type', 'amount', 'timestamp']
+        fields = ['id', 'sale', 'transaction_type', 'amount', 'timestamp', 'tenant']
 
+
+# ----------------------------
+# Payment Serializer
+# ----------------------------
 
 class PaymentSerializer(serializers.ModelSerializer):
     transaction = TransactionSerializer(read_only=True)
 
     class Meta:
         model = Payment
-        fields = ['id', 'transaction', 'method', 'reference']
+        fields = ['id', 'transaction', 'method', 'reference', 'amount', 'commission_amount', 'tenant']
 
 
 # ----------------------------
-# 10. Inventory Alert
+# Commission Serializer
+# ----------------------------
+
+class CommissionSerializer(serializers.ModelSerializer):
+    payment = PaymentSerializer(read_only=True)
+
+    class Meta:
+        model = Commission
+        fields = ['id', 'payment', 'amount', 'tenant']
+
+
+# ----------------------------
+# Delivery Serializer
+# ----------------------------
+
+class DeliverySerializer(serializers.ModelSerializer):
+    order = OrderSerializer(read_only=True)
+    delivered_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Delivery
+        fields = [
+            'id', 'order', 'delivery_type', 'delivered_by',
+            'delivery_date', 'tracking_number', 'delivery_fee', 'tenant'
+        ]
+
+
+# ----------------------------
+# Promotion Serializer
+# ----------------------------
+
+class PromotionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Promotion
+        fields = ['id', 'code', 'description', 'discount_percent', 'start_date', 'end_date', 'active', 'tenant']
+
+
+# ----------------------------
+# Tax Serializer
+# ----------------------------
+
+class TaxSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tax
+        fields = ['id', 'name', 'percentage', 'description', 'active', 'tenant']
+
+
+# ----------------------------
+# Inventory Alert Serializer
 # ----------------------------
 
 class InventoryAlertSerializer(serializers.ModelSerializer):
@@ -155,11 +276,11 @@ class InventoryAlertSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InventoryAlert
-        fields = ['id', 'product', 'created_at', 'resolved']
+        fields = ['id', 'product', 'created_at', 'resolved', 'tenant']
 
 
 # ----------------------------
-# 11. Receipt
+# Receipt Serializer
 # ----------------------------
 
 class ReceiptSerializer(serializers.ModelSerializer):
@@ -167,4 +288,4 @@ class ReceiptSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Receipt
-        fields = ['id', 'sale', 'pdf_file', 'generated_at', 'pdf_generated']
+        fields = ['id', 'sale', 'pdf_file', 'generated_at', 'tenant']
