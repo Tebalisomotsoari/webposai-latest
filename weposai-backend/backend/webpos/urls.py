@@ -56,12 +56,6 @@ router.register(r'receipts', ReceiptViewSet)
 # URL patterns
 # ----------------------------
 urlpatterns = [
-    # Admin site
-    path('admin/', admin.site.urls),
-
     # API v1 routes
     path('api/v1/', include(router.urls)),
-
-    # DRF login/logout views for browsable API
-    path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
 ]

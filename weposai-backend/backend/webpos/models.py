@@ -1,5 +1,6 @@
-from django.db import models
-from django.conf import settings
+from django.db import models # type: ignore
+from django.conf import settings # type: ignore
+from django.contrib.auth.models import AbstractUser # type: ignore
 
 
 # ----------------------------
@@ -19,18 +20,16 @@ class Tenant(models.Model):
 # User & Roles
 # ----------------------------
 
-class User(models.Model):
+class User(AbstractUser):
     ROLE_CHOICES = (
         ('cashier', 'Cashier'),
         ('manager', 'Manager'),
         ('admin', 'Admin'),
     )
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='users')
-    username = models.CharField(max_length=150)
-    email = models.EmailField(blank=True, null=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, default=1)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='cashier')
-    is_active = models.BooleanField(default=True)
-    date_joined = models.DateTimeField(auto_now_add=True)
+
+    # username, email, password, is_active, is_staff are inherited from AbstractUser
 
     def __str__(self):
         return f"{self.username} ({self.role})"
@@ -173,7 +172,7 @@ class SaleItem(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 
     def clean(self):
-        from django.core.exceptions import ValidationError
+        from django.core.exceptions import ValidationError # type: ignore
         if not self.product and not self.service:
             raise ValidationError("SaleItem must have either a product or a service.")
         if self.product and self.service:
